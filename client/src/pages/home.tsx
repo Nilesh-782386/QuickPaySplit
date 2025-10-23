@@ -2,25 +2,27 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Settings, RefreshCcw, TrendingUp, Wallet } from "lucide-react";
+import { Users, RefreshCcw, TrendingUp, Wallet } from "lucide-react";
 import { AddExpenseForm } from "@/components/add-expense-form";
 import { TransactionList } from "@/components/transaction-list";
 import { BalanceCard } from "@/components/balance-card";
-import { SettingsDialog } from "@/components/settings-dialog";
+import { UserManagementDialog } from "@/components/user-management-dialog";
 import { SettleDialog } from "@/components/settle-dialog";
-import type { Balance, Transaction } from "@shared/schema";
+import type { BalanceSummary, TransactionWithUser } from "@shared/schema";
 
 export default function Home() {
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [usersDialogOpen, setUsersDialogOpen] = useState(false);
   const [settleOpen, setSettleOpen] = useState(false);
 
-  const { data: balance, isLoading: balanceLoading } = useQuery<Balance>({
+  const { data: balanceSummary, isLoading: balanceLoading } = useQuery<BalanceSummary>({
     queryKey: ["/api/balance"],
   });
 
-  const { data: transactions, isLoading: transactionsLoading } = useQuery<Transaction[]>({
+  const { data: transactions, isLoading: transactionsLoading } = useQuery<TransactionWithUser[]>({
     queryKey: ["/api/transactions"],
   });
+
+  const hasBalances = balanceSummary && balanceSummary.balances.length > 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -33,16 +35,16 @@ export default function Home() {
             </div>
             <div>
               <h1 className="text-xl font-bold text-foreground">QuickPay</h1>
-              <p className="text-xs text-muted-foreground">Split expenses easily</p>
+              <p className="text-xs text-muted-foreground">Split expenses with your group</p>
             </div>
           </div>
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setSettingsOpen(true)}
-            data-testid="button-settings"
+            onClick={() => setUsersDialogOpen(true)}
+            data-testid="button-users"
           >
-            <Settings className="h-5 w-5" />
+            <Users className="h-5 w-5" />
           </Button>
         </div>
       </header>
@@ -50,7 +52,7 @@ export default function Home() {
       {/* Main Content */}
       <main className="container max-w-2xl mx-auto px-4 py-6 space-y-6">
         {/* Balance Display */}
-        <BalanceCard balance={balance} isLoading={balanceLoading} />
+        <BalanceCard summary={balanceSummary} isLoading={balanceLoading} />
 
         {/* Add Expense Form */}
         <Card data-testid="card-add-expense">
@@ -61,7 +63,7 @@ export default function Home() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <AddExpenseForm userNames={{ user1: balance?.user1Name, user2: balance?.user2Name }} />
+            <AddExpenseForm users={balanceSummary?.users} />
           </CardContent>
         </Card>
 
@@ -73,7 +75,7 @@ export default function Home() {
                 <RefreshCcw className="h-5 w-5 text-primary" />
                 Recent Transactions
               </span>
-              {balance && balance.netBalance !== 0 && (
+              {hasBalances && (
                 <Button
                   variant="destructive"
                   size="sm"
@@ -89,14 +91,13 @@ export default function Home() {
             <TransactionList
               transactions={transactions}
               isLoading={transactionsLoading}
-              userNames={{ user1: balance?.user1Name, user2: balance?.user2Name }}
             />
           </CardContent>
         </Card>
       </main>
 
       {/* Dialogs */}
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <UserManagementDialog open={usersDialogOpen} onOpenChange={setUsersDialogOpen} />
       <SettleDialog open={settleOpen} onOpenChange={setSettleOpen} />
     </div>
   );

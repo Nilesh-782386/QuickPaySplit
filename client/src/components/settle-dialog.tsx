@@ -12,7 +12,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Loader2, AlertTriangle } from "lucide-react";
-import type { Balance } from "@shared/schema";
+import type { BalanceSummary } from "@shared/schema";
 
 interface SettleDialogProps {
   open: boolean;
@@ -22,7 +22,7 @@ interface SettleDialogProps {
 export function SettleDialog({ open, onOpenChange }: SettleDialogProps) {
   const { toast } = useToast();
 
-  const { data: balance } = useQuery<Balance>({
+  const { data: summary } = useQuery<BalanceSummary>({
     queryKey: ["/api/balance"],
   });
 
@@ -52,6 +52,8 @@ export function SettleDialog({ open, onOpenChange }: SettleDialogProps) {
     settleMutation.mutate();
   };
 
+  const hasBalances = summary && summary.balances.length > 0;
+
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent data-testid="dialog-settle">
@@ -64,15 +66,27 @@ export function SettleDialog({ open, onOpenChange }: SettleDialogProps) {
             <p>
               This will clear all outstanding balances and remove all transaction history.
             </p>
-            {balance && balance.netBalance !== 0 && (
-              <div className="p-4 rounded-lg bg-muted/50 border border-border">
+            {hasBalances && (
+              <div className="p-4 rounded-lg bg-muted/50 border border-border space-y-2">
                 <p className="text-sm text-foreground font-medium">
-                  Current balance: <span className="font-mono">₹{Math.abs(balance.netBalance).toFixed(2)}</span>
+                  {summary.balances.length} {summary.balances.length === 1 ? "balance" : "balances"} will be cleared
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {balance.totalTransactions} {balance.totalTransactions === 1 ? "transaction" : "transactions"} will be cleared
-                </p>
+                {summary.balances.slice(0, 3).map((balance) => (
+                  <div key={`${balance.fromUserId}-${balance.toUserId}`} className="text-xs text-muted-foreground">
+                    {balance.fromUserName} → {balance.toUserName}: ₹{balance.amount.toFixed(2)}
+                  </div>
+                ))}
+                {summary.balances.length > 3 && (
+                  <p className="text-xs text-muted-foreground italic">
+                    ...and {summary.balances.length - 3} more
+                  </p>
+                )}
               </div>
+            )}
+            {summary && summary.totalTransactions > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {summary.totalTransactions} {summary.totalTransactions === 1 ? "transaction" : "transactions"} will be removed
+              </p>
             )}
             <p className="text-sm font-semibold">This action cannot be undone.</p>
           </AlertDialogDescription>

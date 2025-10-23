@@ -3,51 +3,62 @@ import { pgTable, text, varchar, numeric, timestamp } from "drizzle-orm/pg-core"
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Transactions table
+// Users/Members table - supports any number of users in a group
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 50 }).notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// Transactions table - now references user IDs
 export const transactions = pgTable("transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  paidBy: varchar("paid_by", { length: 50 }).notNull(),
+  paidById: varchar("paid_by_id", { length: 36 }).notNull(), // References users.id
   amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
   description: text("description").notNull(),
   date: timestamp("date").notNull().default(sql`now()`),
 });
 
-// User configuration table
-export const userConfig = pgTable("user_config", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  user1Name: varchar("user1_name", { length: 50 }).notNull().default("User 1"),
-  user2Name: varchar("user2_name", { length: 50 }).notNull().default("User 2"),
+// Insert schemas
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  name: z.string().min(1, "Name is required").max(50, "Name too long"),
 });
 
-// Insert schemas
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
   id: true,
   date: true,
 }).extend({
   amount: z.coerce.number().positive("Amount must be positive"),
   description: z.string().min(1, "Description is required").max(100),
-  paidBy: z.enum(["user1", "user2"], {
-    errorMap: () => ({ message: "Please select who paid" }),
-  }),
-});
-
-export const insertUserConfigSchema = createInsertSchema(userConfig).omit({
-  id: true,
-}).extend({
-  user1Name: z.string().min(1, "Name is required").max(50),
-  user2Name: z.string().min(1, "Name is required").max(50),
+  paidById: z.string().min(1, "Please select who paid"),
 });
 
 // Types
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
-export type UserConfig = typeof userConfig.$inferSelect;
-export type InsertUserConfig = z.infer<typeof insertUserConfigSchema>;
 
-// Balance type
-export type Balance = {
-  user1Name: string;
-  user2Name: string;
-  netBalance: number; // Positive = user2 owes user1, Negative = user1 owes user2
+// Transaction with user info
+export type TransactionWithUser = Transaction & {
+  paidByName: string;
+};
+
+// Balance between two users
+export type PairwiseBalance = {
+  fromUserId: string;
+  fromUserName: string;
+  toUserId: string;
+  toUserName: string;
+  amount: number; // Positive amount means fromUser owes toUser
+};
+
+// Overall balance summary
+export type BalanceSummary = {
+  users: User[];
+  balances: PairwiseBalance[];
   totalTransactions: number;
 };

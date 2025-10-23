@@ -1,10 +1,9 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
-import { insertTransactionSchema, type InsertTransaction } from "@shared/schema";
+import { insertTransactionSchema, type InsertTransaction, type User } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -25,19 +24,16 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Plus, Loader2 } from "lucide-react";
 
 interface AddExpenseFormProps {
-  userNames?: {
-    user1?: string;
-    user2?: string;
-  };
+  users?: User[];
 }
 
-export function AddExpenseForm({ userNames }: AddExpenseFormProps) {
+export function AddExpenseForm({ users }: AddExpenseFormProps) {
   const { toast } = useToast();
 
   const form = useForm<InsertTransaction>({
     resolver: zodResolver(insertTransactionSchema),
     defaultValues: {
-      paidBy: "user1",
+      paidById: users?.[0]?.id || "",
       amount: 0,
       description: "",
     },
@@ -51,7 +47,7 @@ export function AddExpenseForm({ userNames }: AddExpenseFormProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/balance"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       form.reset({
-        paidBy: form.getValues("paidBy"),
+        paidById: form.getValues("paidById"),
         amount: 0,
         description: "",
       });
@@ -73,28 +69,35 @@ export function AddExpenseForm({ userNames }: AddExpenseFormProps) {
     addExpenseMutation.mutate(data);
   };
 
+  if (!users || users.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        <p>Please add group members first to track expenses.</p>
+      </div>
+    );
+  }
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField
           control={form.control}
-          name="paidBy"
+          name="paidById"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Who paid?</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} defaultValue={field.value || users[0]?.id}>
                 <FormControl>
                   <SelectTrigger data-testid="select-paidby">
                     <SelectValue placeholder="Select who paid" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="user1" data-testid="option-user1">
-                    {userNames?.user1 || "User 1"}
-                  </SelectItem>
-                  <SelectItem value="user2" data-testid="option-user2">
-                    {userNames?.user2 || "User 2"}
-                  </SelectItem>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={user.id} data-testid={`option-${user.id}`}>
+                      {user.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <FormMessage />
