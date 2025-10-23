@@ -38,6 +38,7 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const transaction: Transaction = {
       ...insertTransaction,
+      amount: insertTransaction.amount.toString(),
       id,
       date: new Date(),
     };
