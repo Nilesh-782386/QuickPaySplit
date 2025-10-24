@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Loader2, UserPlus, Trash2, Users as UsersIcon } from "lucide-react";
+import { PasswordDialog } from "@/components/password-dialog";
 
 interface UserManagementDialogProps {
   open: boolean;
@@ -32,6 +33,8 @@ interface UserManagementDialogProps {
 export function UserManagementDialog({ open, onOpenChange }: UserManagementDialogProps) {
   const { toast } = useToast();
   const [isAddingUser, setIsAddingUser] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [pendingUserData, setPendingUserData] = useState<InsertUser | null>(null);
 
   const { data: users } = useQuery<User[]>({
     queryKey: ["/api/users"],
@@ -46,7 +49,7 @@ export function UserManagementDialog({ open, onOpenChange }: UserManagementDialo
   });
 
   const addUserMutation = useMutation({
-    mutationFn: async (data: InsertUser) => {
+    mutationFn: async (data: { user: InsertUser; password: string }) => {
       return await apiRequest("POST", "/api/users", data);
     },
     onSuccess: () => {
@@ -54,8 +57,10 @@ export function UserManagementDialog({ open, onOpenChange }: UserManagementDialo
       queryClient.invalidateQueries({ queryKey: ["/api/balance"] });
       form.reset();
       setIsAddingUser(false);
+      setPasswordDialogOpen(false);
+      setPendingUserData(null);
       toast({
-        title: "User added",
+        title: "👤 User Added!",
         description: "New member has been added to the group.",
       });
     },
@@ -65,6 +70,8 @@ export function UserManagementDialog({ open, onOpenChange }: UserManagementDialo
         title: "Error",
         description: error.message || "Failed to add user. Please try again.",
       });
+      setPasswordDialogOpen(false);
+      setPendingUserData(null);
     },
   });
 
@@ -91,7 +98,15 @@ export function UserManagementDialog({ open, onOpenChange }: UserManagementDialo
   });
 
   const onSubmit = (data: InsertUser) => {
-    addUserMutation.mutate(data);
+    // Store the user data and show password dialog
+    setPendingUserData(data);
+    setPasswordDialogOpen(true);
+  };
+
+  const handlePasswordConfirm = (password: string) => {
+    if (pendingUserData) {
+      addUserMutation.mutate({ user: pendingUserData, password });
+    }
   };
 
   const handleDeleteUser = (userId: string) => {
@@ -112,17 +127,17 @@ export function UserManagementDialog({ open, onOpenChange }: UserManagementDialo
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UsersIcon className="h-5 w-5 text-primary" />
-            Manage Group Members
+            👥 Manage Group Members
           </DialogTitle>
           <DialogDescription>
-            Add or remove people from your expense group.
+            ➕ Add or remove people from your expense group.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 pt-4">
           {/* Current Users */}
           <div className="space-y-2">
-            <h4 className="text-sm font-medium text-foreground">Current Members ({users?.length || 0})</h4>
+            <h4 className="text-sm font-medium text-foreground">👤 Current Members ({users?.length || 0})</h4>
             <div className="space-y-2 max-h-[200px] overflow-y-auto">
               {users?.map((user) => (
                 <div
@@ -220,6 +235,16 @@ export function UserManagementDialog({ open, onOpenChange }: UserManagementDialo
           )}
         </div>
       </DialogContent>
+
+      {/* Password Dialog */}
+      <PasswordDialog
+        open={passwordDialogOpen}
+        onOpenChange={setPasswordDialogOpen}
+        onPasswordConfirm={handlePasswordConfirm}
+        title="Confirm Team Member"
+        description={`🔒 Enter password to confirm adding "${pendingUserData?.name}" to the group.`}
+        isLoading={addUserMutation.isPending}
+      />
     </Dialog>
   );
 }

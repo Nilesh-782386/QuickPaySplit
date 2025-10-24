@@ -4,6 +4,13 @@ import { storage } from "./storage";
 import { insertTransactionSchema, insertUserSchema } from "@shared/schema";
 import { z } from "zod";
 
+// Simple password system - in production, use proper authentication
+const ADMIN_PASSWORD = "admin123"; // Default password
+
+function validatePassword(password: string): boolean {
+  return password === ADMIN_PASSWORD;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Get all users
   app.get("/api/users", async (_req, res) => {
@@ -21,7 +28,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new user
   app.post("/api/users", async (req, res) => {
     try {
-      const validatedData = insertUserSchema.parse(req.body);
+      // Validate password first
+      const password = req.body.password;
+      if (!password || !validatePassword(password)) {
+        return res.status(401).json({
+          error: "Invalid password",
+          message: "Password is required to add new users"
+        });
+      }
+      
+      // Handle both nested and flat structures
+      let userToValidate;
+      
+      // Check if it's nested structure: { user: { name: "..." }, password: "..." }
+      if (req.body.user && typeof req.body.user === 'object') {
+        userToValidate = req.body.user;
+      } 
+      // Check if it's flat structure: { name: "...", password: "..." }
+      else if (req.body.name) {
+        userToValidate = { name: req.body.name };
+      } 
+      // Invalid structure
+      else {
+        return res.status(400).json({
+          error: "Invalid request structure",
+          message: "Request must contain either 'user' object with 'name' or 'name' field directly"
+        });
+      }
+      
+      const validatedData = insertUserSchema.parse(userToValidate);
       const user = await storage.createUser(validatedData);
       
       res.json({
@@ -128,6 +163,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       res.status(500).json({
         error: "Failed to settle balances",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // Delete all history (clear transactions and reset balances)
+  app.post("/api/delete-history", async (req, res) => {
+    try {
+      const { password } = req.body;
+      
+      // Validate password
+      if (!password || !validatePassword(password)) {
+        return res.status(401).json({
+          error: "Invalid password",
+          message: "Password is required to delete all history"
+        });
+      }
+      
+      await storage.clearTransactions();
+      const summary = await storage.getBalanceSummary();
+      
+      res.json({
+        success: true,
+        message: "All history deleted",
+        summary,
+      });
+    } catch (error) {
+      res.status(500).json({
+        error: "Failed to delete history",
         message: error instanceof Error ? error.message : "Unknown error"
       });
     }

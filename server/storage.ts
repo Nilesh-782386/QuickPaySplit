@@ -75,7 +75,7 @@ export class MemStorage implements IStorage {
     this.users.delete(id);
     // Also delete any transactions by this user
     const transactionsToDelete: string[] = [];
-    for (const [txId, tx] of this.transactions.entries()) {
+    for (const [txId, tx] of Array.from(this.transactions.entries())) {
       if (tx.paidById === id) {
         transactionsToDelete.push(txId);
       }
@@ -87,9 +87,12 @@ export class MemStorage implements IStorage {
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
     const id = randomUUID();
     const transaction: Transaction = {
-      ...insertTransaction,
-      amount: insertTransaction.amount.toString(),
       id,
+      paidById: insertTransaction.paidById,
+      amount: insertTransaction.amount.toString(),
+      description: insertTransaction.description,
+      splitMode: insertTransaction.splitMode || "divide",
+      owedById: insertTransaction.owedById || null,
       date: new Date(),
     };
     this.transactions.set(id, transaction);
@@ -101,10 +104,29 @@ export class MemStorage implements IStorage {
     const users = await this.getAllUsers();
     const userMap = new Map(Array.from(users.map(u => [u.id, u] as [string, User])));
     
-    const txsWithUser: TransactionWithUser[] = txs.map(tx => ({
-      ...tx,
-      paidByName: userMap.get(tx.paidById)?.name || "Unknown User",
-    }));
+    const txsWithUser: TransactionWithUser[] = txs.map(tx => {
+      // Get the stored transaction data directly from the Map
+      const storedTx = this.transactions.get(tx.id);
+      
+      const result = {
+        id: tx.id,
+        paidById: tx.paidById,
+        amount: tx.amount,
+        description: tx.description,
+        splitMode: (storedTx as any)?.splitMode || "divide",
+        owedById: (storedTx as any)?.owedById || null,
+        date: tx.date,
+        paidByName: userMap.get(tx.paidById)?.name || "Unknown User",
+        owedByName: (storedTx as any)?.owedById ? userMap.get((storedTx as any).owedById)?.name : undefined,
+      };
+      
+      // Ensure splitMode is explicitly included in the response
+      if (!result.splitMode) {
+        result.splitMode = "divide";
+      }
+      
+      return result;
+    });
     
     // Sort by date descending (most recent first)
     return txsWithUser.sort((a, b) => 
@@ -138,14 +160,26 @@ export class MemStorage implements IStorage {
     
     for (const tx of transactions) {
       const amount = parseFloat(tx.amount);
-      const splitAmount = amount / numUsers; // Each person's share
+      const splitMode = (tx as any).splitMode || "divide";
       
-      // The payer is owed splitAmount by each other user
-      for (const user of users) {
-        if (user.id !== tx.paidById) {
-          const key = `${user.id}-${tx.paidById}`;
+      if (splitMode === "full") {
+        // Full mode: one person owes the complete amount
+        if ((tx as any).owedById) {
+          const key = `${(tx as any).owedById}-${tx.paidById}`;
           const current = balanceMap.get(key) || 0;
-          balanceMap.set(key, current + splitAmount);
+          balanceMap.set(key, current + amount);
+        }
+      } else {
+        // Divide mode: split equally among all users
+        const splitAmount = amount / numUsers; // Each person's share
+        
+        // The payer is owed splitAmount by each other user
+        for (const user of users) {
+          if (user.id !== tx.paidById) {
+            const key = `${user.id}-${tx.paidById}`;
+            const current = balanceMap.get(key) || 0;
+            balanceMap.set(key, current + splitAmount);
+          }
         }
       }
     }

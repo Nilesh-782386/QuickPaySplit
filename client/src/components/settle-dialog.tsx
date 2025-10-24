@@ -60,11 +60,11 @@ export function SettleDialog({ open, onOpenChange }: SettleDialogProps) {
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-destructive" />
-            Settle All Balances
+            💰 Settle All Balances
           </AlertDialogTitle>
           <AlertDialogDescription className="space-y-3 pt-2">
             <p>
-              This will clear all outstanding balances and remove all transaction history.
+              ⚠️ This will clear all outstanding balances and remove all transaction history.
             </p>
             {hasBalances && (
               <div className="p-4 rounded-lg bg-muted/50 border border-border space-y-2">

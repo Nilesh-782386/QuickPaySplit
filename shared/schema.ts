@@ -16,6 +16,8 @@ export const transactions = pgTable("transactions", {
   paidById: varchar("paid_by_id", { length: 36 }).notNull(), // References users.id
   amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
   description: text("description").notNull(),
+  splitMode: varchar("split_mode", { length: 10 }).notNull().default("divide"), // "divide" or "full"
+  owedById: varchar("owed_by_id", { length: 36 }), // For "full" mode - who owes the money
   date: timestamp("date").notNull().default(sql`now()`),
 });
 
@@ -34,6 +36,8 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({
   amount: z.coerce.number().positive("Amount must be positive"),
   description: z.string().min(1, "Description is required").max(100),
   paidById: z.string().min(1, "Please select who paid"),
+  splitMode: z.enum(["divide", "full"]).default("divide"),
+  owedById: z.string().optional(),
 });
 
 // Types
@@ -45,6 +49,7 @@ export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 // Transaction with user info
 export type TransactionWithUser = Transaction & {
   paidByName: string;
+  owedByName?: string;
 };
 
 // Balance between two users
