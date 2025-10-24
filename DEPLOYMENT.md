@@ -3,17 +3,20 @@
 ## 🚀 Vercel Deployment Fix
 
 ### The Problem
-Vercel was serving raw source code instead of the built React application.
+Vercel was showing 404 NOT_FOUND error because:
+- This is a monorepo with React app in `client/` folder
+- Vercel was looking for build output in wrong location
+- Static file serving path was incorrect
 
 ### The Solution
-Added proper `vercel.json` configuration to handle full-stack deployment.
+Fixed `vercel.json` configuration and server static file path for monorepo structure.
 
 ## 📋 Deployment Steps
 
 ### 1. Commit and Push Changes
 ```bash
 git add .
-git commit -m "Fix Vercel deployment configuration"
+git commit -m "Fix Vercel deployment for monorepo structure"
 git push origin main
 ```
 
@@ -25,13 +28,13 @@ git push origin main
 
 ### 3. Verify Deployment
 After deployment, check:
-- ✅ React app loads (not source code)
+- ✅ React app loads (not 404 error)
 - ✅ API endpoints work (`/api/users`, `/api/balance`, etc.)
 - ✅ All features functional
 
-## 🔧 Configuration Files Added
+## 🔧 Configuration Files Fixed
 
-### `vercel.json`
+### `vercel.json` (Updated)
 ```json
 {
   "version": 2,
@@ -51,12 +54,24 @@ After deployment, check:
       "dest": "/server/index.ts"
     },
     {
+      "src": "/assets/(.*)",
+      "dest": "/dist/public/assets/$1"
+    },
+    {
+      "src": "/favicon.png",
+      "dest": "/dist/public/favicon.png"
+    },
+    {
       "src": "/(.*)",
-      "dest": "/index.html"
+      "dest": "/dist/public/index.html"
     }
   ]
 }
 ```
+
+### `server/vite.ts` (Fixed)
+- Updated `serveStatic` function to look in correct path: `../dist/public`
+- Fixed static file serving for production
 
 ### `.vercelignore`
 Excludes unnecessary files from deployment.
@@ -64,7 +79,7 @@ Excludes unnecessary files from deployment.
 ## 🎯 Expected Result
 
 After deployment, your app should show:
-- ✅ Beautiful React interface
+- ✅ Beautiful React interface (no 404 error)
 - ✅ Expense splitting functionality
 - ✅ User management
 - ✅ Analytics dashboard
@@ -76,6 +91,6 @@ After deployment, your app should show:
 1. Check Vercel build logs
 2. Verify `dist/public` contains built files
 3. Ensure all dependencies are installed
-4. Check environment variables if needed
+4. Check that static files are being served correctly
 
 **The deployment should now work correctly!** 🚀
